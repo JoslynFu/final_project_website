@@ -1,0 +1,110 @@
+---
+title: "Final Project Joslyn Kelly"
+author: "Joslyn Fu and Kelly Yuan"
+date: "12/9/2020"
+output: html_document
+---
+
+## Project Overview
+
+From the previous extinction module, we're pretty sure that the sixth mass extinction is around the corner. According to its definition, extinction usually begins with the loss in abundance of individuals that can result in compositional and functional changes of ecosystems. This assignment would be based on the research done by Kenneth V. Rosenberg, "Decline of the North American avifauna." We would use the data his team once used and answer the following three questions:
+1. Is the population of birds really declining? To what extent?
+2. If the answer to the first question is yes, is every famliy of birds encountering the same decline? In other words, is every species being affected equally by this changing environment?
+3. What's the effect of declining of birds on other related species?
+
+## Data Import
+
+```{r include=FALSE}
+library("tidyverse")
+library("readxl")
+```
+
+In the research conducted by Kenneth V. Rosenberg, they used these following two datasets:
+```{r}
+data <- read_excel("aaw1313_Data_S1.xlsx")
+data 
+```
+
+```{r}
+summary <- read_excel("aaw1313_Data_S2.xlsx")
+summary
+```
+However, these two datasets have a lot of overlaps. We will analyze our problems based on the first dataset.
+
+## Question 1: Is the population of birds really declining? To what extent?
+
+We now have a very large dataset. To make our moves in the future simple, let's choose some factors to analyze:
+```{r}
+simple_data <- data %>% select(1,4,6,7,8,9,10,11,14,15,20)
+simple_data
+```
+
+The last column "loss_med" is the estimated change in number of breeding individuals over the trend period (usually 1970-2017), based on a combination of current population estimates and long-term trajectories. Median of the posterior distribution from the hierarchical Bayesian model. Now, let's do an average on this over all speices, grouped by the group of bird. 
+
+```{r}
+loss <- simple_data %>% 
+  group_by(bird.group) %>%
+  summarize(mean_loss = mean(Loss_med),mean_pop_size = mean(popest)) %>%
+  mutate(change_rate = mean_loss/mean_pop_size) %>%
+  ggplot(aes(x = bird.group,y = change_rate,fill=bird.group)) + geom_bar(stat = "identity")
+loss
+```
+
+
+Based on this graph, we are pretty sure that the mean_loss is very large for most groups of birds, except for the waterfowl. We suspect that waterfowls's amount is increasing because for geese and ducks, people might raise them manually. 
+
+## Question 2: Is the decline of populations even among all speices? Are there certain species that experience more effect than others? 
+
+Let's dig deeper based on what we've done in question 1. We would group the data by family to make everything easy to read. To get the proportion of loss, we divide the mean_loss by the total mean_loss instead of 3.2 billiion, which is the amount given in Rosenberg's paper.
+
+```{r}
+family_loss <- simple_data %>% 
+  group_by(Family)%>%
+  summarize(mean_loss = mean(Loss_med), number=n()) %>% 
+  filter(mean_loss > 0) %>% 
+  mutate(proportion_of_loss = mean_loss/sum(mean_loss)) %>%
+  arrange(desc(proportion_of_loss))
+family_loss
+```
+
+The proportion is so small that it's very uncomfortable for us to see. 
+```{r}
+family_loss %>%
+  ggplot(aes(x=Family, y=proportion_of_loss,fill=Family)) + geom_bar(width = 1, stat = "identity") 
+```
+
+There are some families that experience population gains. Let's list them out. As what we did before for the family_loss, we divide the mean_gain by the total gains, calculated by sum(mean_gain).
+```{r}
+family_gain <- simple_data %>% 
+  group_by(Family)%>%
+  summarize(mean_loss = mean(Loss_med), number=n()) %>% 
+  filter(mean_loss < 0) %>% 
+  mutate(mean_gain = -mean_loss, proportion_of_gain = mean_gain/sum(mean_gain)) %>%
+  arrange(desc(proportion_of_gain))
+family_gain
+```
+As before, let's try to do the graph for family_gain
+```{r}
+family_gain %>%
+  ggplot(aes(x=Family, y=proportion_of_gain,fill=Family)) + geom_bar(width = 1, stat = "identity") 
+```
+
+Therefore, apparently not every species is affected equally by this changing environment. There are species that suffered from loss, and also species accumulated more population. 
+
+## Question 3: What's the effect of declining of birds on other related species?
+
+We further explore the relationship between birds and insects. 
+
+In our dataset, there's one column "AI" that identifies species in the "Aerial Insectivore" group, birds that capture flying insects while in flight. 
+
+```{r}
+AI <- simple_data  %>% 
+  group_by(AI) %>%
+  summarize (sum_loss = sum(Loss_med), mean = mean(Loss_med))
+AI
+```
+
+The total loss of AI group is less than that of the other group; however, the mean loss is larger for AI. This means that for every species within AI group, they encounter more loss of populations. 
+
+From the article "Plummeting insect numbers 'threaten collapse of nature'," we surprisingly find that more than 40% of insect species are declining and a third are endangered. The rate of extinction is eight times faster than that of mammals, birds and reptiles. The total mass of insects is falling by a precipitous 2.5% a year, according to the best data available, suggesting they could vanish within a century. This contradicts with our findings from the extinction module, where we found that the rate of decline for birds is higher than that of insects. Therefore, we requires further investigation with more precise data to learn about the relationship between birds and insects.
+
